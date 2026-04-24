@@ -1,10 +1,11 @@
-function [t,o] = tsurf(F,V,varargin)
+function [t,o] = tsurf(varargin)
   % TSURF trisurf wrapper, easily plot triangle meshes with(out) face or vertex
   % indices. Attaches callbacks so that click-and-holding on the mesh and then
   % pressing 'm' launches meshplot (if available)
   %
   % t = tsurf(F,V);
-  % t = tsurf(F,V,'ParameterName',ParameterValue, ...)
+  % t = tsurf(PI,PC,V);
+  % t = tsurf(...,'ParameterName',ParameterValue, ...)
   %
   % Inputs:
   %   F  list of faces #F x 3
@@ -38,6 +39,26 @@ function [t,o] = tsurf(F,V,varargin)
   %
   % See also: trisurf
   %
+
+  if nargin == 1
+    error('tsurf:TooFewInputs', ...
+          'Not enough input arguments. See help tsurf for usage.');
+  end
+  if nargin == 2 || ischar(varargin{3}) || iscell(varargin{3}) || isstruct(varargin{3})
+    F = varargin{1};
+    V = varargin{2};
+    v = 3;
+    poly = false;
+    poly_input = false;
+  else
+    PI = reshape(varargin{1},[],1);
+    PC = reshape(varargin{2},[],1);
+    V = varargin{3};
+    [F,J,E] = polygons_to_triangles(PI,PC);
+    poly_input = true;
+    poly = true;
+    v = 4;
+  end
   
   if issparse(V)
       V = full(V);
@@ -50,9 +71,12 @@ function [t,o] = tsurf(F,V,varargin)
   buttondownfcn = 'default';
   draw_outline = false;
 
-  v = 1;
   while v<=numel(varargin) && ischar(varargin{v}) 
     switch varargin{v}
+    case 'Poly'
+      v = v+1;
+      assert(v<=numel(varargin));
+      poly = varargin{v};
     case 'Outline'
       v = v+1;
       assert(v<=numel(varargin));
@@ -131,6 +155,13 @@ function [t,o] = tsurf(F,V,varargin)
   else
     t_copy = trisurf(F,V(:,1),V(:,2),V(:,3));
     FC = barycenter(V,F);
+    if poly
+      FI = 1:size(PC,1)-1;
+      S = sparse(J,(1:size(F,1))',1,size(PC,1)-1,size(F,1));
+      S = S./sum(S,2);
+      FC = S*FC;
+    end
+
     if(abs(face_indices)==1)
       text(FC(:,1),FC(:,2),FC(:,3),num2str((FI)'),'BackgroundColor',[.7 .7 .7]);
     elseif(face_indices)
@@ -178,6 +209,16 @@ function [t,o] = tsurf(F,V,varargin)
   cdata_v = find(cellfun(@(c) ischar(c) && strcmpi(c,'cdata'),varargin),1,'last');
   if ~isempty(cdata_v) && (cdata_v+1)<=numel(varargin)
     varargin{cdata_v+1} = double(varargin{cdata_v+1});
+  end
+
+  if poly
+    set(t_copy,'CData',J);
+    ish = ishold;
+    hold on;
+    o_copy = tsurf(E,V);
+    if ~ish
+      hold off;
+    end
   end
 
   if v<=numel(varargin)
