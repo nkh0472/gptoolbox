@@ -151,6 +151,8 @@ if(WITH_ELTOPO)
   endif()
 endif()
 
+set( PLATFORM_SHARED_LIB_SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX} )
+set( PLATFORM_SHARED_LIB_PREFIX ${CMAKE_SHARED_LIBRARY_PREFIX} )
 set( CMAKE_SHARED_LIBRARY_SUFFIX ".${Matlab_MEX_EXTENSION}" )  # set suffix to .mexa64
 set( CMAKE_SHARED_LIBRARY_PREFIX )      # remove the "lib" prefix
 set( CMAKE_SHARED_LIBRARY_CXX_FLAGS )       # remove the -fPIC option. mex does not accept the "-fPIC" option
@@ -179,6 +181,29 @@ endfunction()
 list(APPEND CORE_LIBS ${Matlab_LIBRARIES})
 
 #list(APPEND MEX_SOURCES "impaste.cpp")
+
+option(WITH_LIBCCD "Use libccd for convex hull collision detection" ON)
+if(WITH_LIBCCD)
+  set(ENABLE_DOUBLE_PRECISION ON CACHE BOOL "" FORCE)
+  # libccd v2.1 has cmake_minimum_required < 3.5; this allows it to configure
+  set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+  FetchContent_Declare(
+    libccd
+    GIT_REPOSITORY https://github.com/danfis/libccd.git
+    GIT_TAG        v2.1
+  )
+  FetchContent_MakeAvailable(libccd)
+  set_target_properties(ccd PROPERTIES
+    SUFFIX "${PLATFORM_SHARED_LIB_SUFFIX}"
+    PREFIX "${PLATFORM_SHARED_LIB_PREFIX}")
+  compile_each("\
+gjk_intersect.cpp;\
+gjk_penetration.cpp;\
+mpr_intersect.cpp;\
+mpr_penetration.cpp;\
+"
+    "${CORE_LIBS};igl::core;igl_restricted::matlab;ccd")
+endif()
 
 # LIBIGL
 add_definitions("-DMEX")
